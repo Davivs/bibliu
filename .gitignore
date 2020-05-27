@@ -1,0 +1,9 @@
+node_modules
+.history
+*.log
+.idea
+.env
+logs
+error.json
+out
+rdf-files/
