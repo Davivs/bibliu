@@ -7,3 +7,5 @@ logs
 error.json
 out
 rdf-files/
+.nyc_output/
+coverage/

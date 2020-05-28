@@ -14,8 +14,7 @@ async function insertBook(book)
         transaction = await db.sequelize.transaction();
         return await db.books.create(book, {include : [db.authors]}, transaction);
     } catch (err) {
-        // Rollback transaction only if the transaction object is defined
-        if (transaction) await transaction.rollback();
+        return (err);
     }
 }
 
@@ -40,7 +39,7 @@ async function readFile(data)
         parser.parseString(data, async function (err, result) {
             let subjects = [];
             let authors = [];
-            if (result) {
+            //if (result) {
                 const id = result["rdf:RDF"]["pgterms:ebook"][0]["$"]["rdf:about"].substr(7); // Extract bookId from about
                 const title = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:title"][0]; // Parse title from file
                 const publisher = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:publisher"][0]; // Parse publisher from file
@@ -48,21 +47,19 @@ async function readFile(data)
                 const language = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:language"][0]["rdf:Description"][0]["rdf:value"][0]["_"]; // Parse language from file
                 const license = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:rights"][0]; // Parse License from file
 
-
-                if (result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"]) // If book doesn't have subjects
-                    result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"].forEach(element => subjects.push(element["rdf:Description"][0]["rdf:value"][0])); // Create an array of subjects, could be used to create another Sequelize association if we need to query
+                result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"].forEach(element => subjects.push(element["rdf:Description"][0]["rdf:value"][0])); // Create an array of subjects, could be used to create another Sequelize association if we need to query
                 if (result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:creator"]) // If book doesn't have authors
                     result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:creator"].forEach(element => authors.push({name: element["pgterms:agent"][0]["pgterms:name"][0].replace(/,/g, "")})); // Create an array of Authors so we can query them.
 
                 newBook = new bookInformation(id, title, authors, publisher, pubDate, language, JSON.stringify(subjects), license);
 
                 const bookInsert = await insertBook(newBook); // We could use this await to have proper answer through API.
-                resolve(bookInsert.dataValues);
 
-            } else {
+                resolve(bookInsert);
+            /*} else {
                 inspect(err);
                 resolve (err);
-            }
+            }*/
         });
     });
     return promise;
@@ -77,7 +74,10 @@ router.get('/:book', async function(req, res, next) {
     try {
         const data = fs.readFileSync(`./rdf-files/cache/epub/${bookId}/pg${bookId}.rdf`, 'utf8');
         const book = await readFile(data);
-        res.status(201).json(book);
+        if (!book.errors)
+            res.status(201).json(book.dataValues);
+        else
+            res.status(400).json(book.errors[0]);
     }
     catch (err) {
         res.status(400).json(err);

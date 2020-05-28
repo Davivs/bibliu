@@ -23,7 +23,7 @@ describe('/GET bibliu', () => {
 });
 
 describe('/GET bibliu book Id 1', () => {
-    it('it should get the book with id 1 and check its title', (done) => {
+    it('it should add the book with id 1 and check its title', (done) => {
         let param = 1;
         chai.request(server)
             .get(`/bibliu/${param}`)
@@ -31,6 +31,18 @@ describe('/GET bibliu book Id 1', () => {
                 res.should.have.status(201);
                 res.body.should.be.a('object');
                 res.body.title.should.equal("The Declaration of Independence of the United States of America");
+                done();
+            });
+    });
+});
+
+describe('/GET bibliu book Id 1', () => {
+    it('it should try to add the book with id 1 again and fail as it has already been inserted', (done) => {
+        let param = 1;
+        chai.request(server)
+            .get(`/bibliu/${param}`)
+            .end((err, res) => {
+                res.should.have.status(400);
                 done();
             });
     });
@@ -47,4 +59,19 @@ describe('/GET bibliu book Id 0', () => {
             });
     });
 });
+
+describe('/GET bibliu book Id 7', () => {
+    it('it should get the book with id 7 and test case without author', (done) => {
+        let param = 7;
+        chai.request(server)
+            .get(`/bibliu/${param}`)
+            .end((err, res) => {
+                res.should.have.status(201);
+                res.body.authors.should.deep.equal([]);
+                done();
+            });
+    });
+});
+
+
 
