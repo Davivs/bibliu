@@ -16,7 +16,7 @@ const sequelize = new Sequelize(dbConfig.DB, dbConfig.USER, dbConfig.PASSWORD, {
         timezone: 'Etc/GMT+1',
     },
     // disable logging; default: console.log
-    //logging: false
+    logging: false
 });
 
 const db = {};

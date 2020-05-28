@@ -1,5 +1,3 @@
-/*
-
 var assert = require('assert');
 var bibliu = require('../routes/bibliu');
 
@@ -11,15 +9,42 @@ let server = require('../app');
 chai.use(chaiHttp);
 
 describe('/GET bibliu', () => {
-    it('it should GET one book', (done) => {
+    it('it should get one book', (done) => {
+        let param = 27;
         chai.request(server)
-            .get('/bibliu')
+            .get(`/bibliu/${param}`)
             .end((err, res) => {
-                res.should.have.status(200);
-                res.text.should.be.a('object');
+                res.should.have.status(201);
+                res.body.should.be.a('object');
+                res.body.id.should.equal(param.toString());
                 done();
             });
     });
 });
 
-*/
+describe('/GET bibliu book Id 1', () => {
+    it('it should get the book with id 1 and check its title', (done) => {
+        let param = 1;
+        chai.request(server)
+            .get(`/bibliu/${param}`)
+            .end((err, res) => {
+                res.should.have.status(201);
+                res.body.should.be.a('object');
+                res.body.title.should.equal("The Declaration of Independence of the United States of America");
+                done();
+            });
+    });
+});
+
+describe('/GET bibliu book Id 0', () => {
+    it('it should get the book with id 0 and fail as it does not exist', (done) => {
+        let param = 0;
+        chai.request(server)
+            .get(`/bibliu/${param}`)
+            .end((err, res) => {
+                res.should.have.status(400);
+                done();
+            });
+    });
+});
+

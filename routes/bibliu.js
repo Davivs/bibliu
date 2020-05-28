@@ -8,14 +8,15 @@ db.sequelize.sync();
 
 async function insertBook(book)
 {
-    db.books.create(book, {
-        include : [ db.authors ],
-    }).then(data => {
-        return data.dataValues; // Object from Sequelize
-    }).catch(err => {
-        inspect(err);
-        return err;
-    });
+    let transaction;
+
+    try {
+        transaction = await db.sequelize.transaction();
+        return await db.books.create(book, {include : [db.authors]}, transaction);
+    } catch (err) {
+        // Rollback transaction only if the transaction object is defined
+        if (transaction) await transaction.rollback();
+    }
 }
 
 class bookInformation {
@@ -32,22 +33,14 @@ class bookInformation {
     }
 }
 
-async function readFile(filePath)
+async function readFile(data)
 {
     const parser = new xml2js.Parser();
-    fs.readFile(filePath, function(err, data)
-    {
-        if (err) // If filePath does not exist, could do a proper folder parser, not the point of this project.
-        {
-            inspect(err);
-            return;
-        }
-
+    const promise = await new Promise((resolve, reject) => {
         parser.parseString(data, async function (err, result) {
             let subjects = [];
             let authors = [];
-            if (result)
-            {
+            if (result) {
                 const id = result["rdf:RDF"]["pgterms:ebook"][0]["$"]["rdf:about"].substr(7); // Extract bookId from about
                 const title = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:title"][0]; // Parse title from file
                 const publisher = result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:publisher"][0]; // Parse publisher from file
@@ -57,29 +50,38 @@ async function readFile(filePath)
 
 
                 if (result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"]) // If book doesn't have subjects
-                    result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"].forEach(element => subjects.push(element["rdf:Description"][0]["rdf:value"])); // Create an array of subjects, could be used to create another Sequelize association if we need to query
+                    result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:subject"].forEach(element => subjects.push(element["rdf:Description"][0]["rdf:value"][0])); // Create an array of subjects, could be used to create another Sequelize association if we need to query
                 if (result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:creator"]) // If book doesn't have authors
                     result["rdf:RDF"]["pgterms:ebook"][0]["dcterms:creator"].forEach(element => authors.push({name: element["pgterms:agent"][0]["pgterms:name"][0].replace(/,/g, "")})); // Create an array of Authors so we can query them.
 
                 newBook = new bookInformation(id, title, authors, publisher, pubDate, language, JSON.stringify(subjects), license);
 
                 const bookInsert = await insertBook(newBook); // We could use this await to have proper answer through API.
-            }
-            else
-            {
+                resolve(bookInsert.dataValues);
+
+            } else {
                 inspect(err);
-                return err;
+                resolve (err);
             }
         });
     });
+    return promise;
 }
 
 
 /* GET books */
-router.get('/', async function(req, res, next) {
+router.get('/:book', async function(req, res, next) {
 
-    const book = await readFile("./rdf-files/cache/epub/1/pg1.rdf");
-    res.send("Done");
+    let bookId = req.params.book;
+
+    try {
+        const data = fs.readFileSync(`./rdf-files/cache/epub/${bookId}/pg${bookId}.rdf`, 'utf8');
+        const book = await readFile(data);
+        res.status(201).json(book);
+    }
+    catch (err) {
+        res.status(400).json(err);
+    }
 
     /*
     for (let i = 1; i < 60000; i++)
